@@ -1,6 +1,7 @@
 import java.io.*;
 import java.math.BigInteger;
 import java.net.*;
+import java.nio.ByteBuffer;
 
 public class Main {
     public static void main(String[] args) throws IOException {
@@ -19,7 +20,6 @@ class UDPServer extends Thread {
 
     public UDPServer() {
         super("UDP SERVER THREAD");
-
         buffer = new byte[BUFFER_SIZE];
         packet = new DatagramPacket(buffer, buffer.length);
         numberOfPackages = 0;
@@ -33,7 +33,7 @@ class UDPServer extends Thread {
     }
 
     protected void sendInfoPacket(InetAddress address) {
-        buffer = BigInteger.valueOf(numberOfPackages).toByteArray();
+        buffer = ByteBuffer.allocate(numberOfPackages).array();
         packet = new DatagramPacket(buffer, buffer.length, address, PORT);
 
         try {
@@ -53,18 +53,22 @@ class UDPServer extends Thread {
         while (true) {
             try {
                 socket.receive(packet);
-                String message = packet.toString();
                 InetAddress address = packet.getAddress();
 
-                if (message.equals("start_test")) {
-                    System.out.println("Starting the test with " + address.getHostAddress()+"\n===================");
-                    while (isActive()) {
-                        try {
-                            socket.receive(packet);
-                            numberOfPackages++;
-                        } catch (IOException e) {
-                            System.err.println("Packet has missed");
-                        }
+                try {
+                    Thread.sleep(5000);
+                } catch (InterruptedException e) {
+                    System.err.println(e);
+                }
+
+                System.out.println("Starting the test with " + address.getHostAddress()+"\n===================");
+                while (isActive()) {
+                    try {
+                        socket.receive(packet);
+                        numberOfPackages++;
+                        System.out.println("Get packet number" + Integer.toString(numberOfPackages));
+                    } catch (IOException e) {
+                        System.err.println("Packet has missed");
                     }
                 }
 
