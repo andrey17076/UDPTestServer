@@ -1,5 +1,4 @@
 import java.io.*;
-import java.math.BigInteger;
 import java.net.*;
 import java.nio.ByteBuffer;
 
@@ -10,75 +9,57 @@ public class Main {
 }
 
 class UDPServer extends Thread {
+    private static final int PACKAGE_QUANT = 1000;
+    private static final int BUFFER_SIZE = 1000;
+    private static final int PORT = 5555;
+    private static final int TIMEOUT = 5000;
+
+    private static final int START_MSG = PACKAGE_QUANT + 1;
+    private static final int END_MSG = START_MSG + 1;
+
     protected byte[] buffer;
     protected DatagramSocket socket;
     protected DatagramPacket packet;
-    protected int numberOfPackages;
 
-    private static final int BUFFER_SIZE = 1000;
-    private static final int PORT = 5555;
-
-    public UDPServer() {
+    public UDPServer() throws SocketException{
         super("UDP SERVER THREAD");
         buffer = new byte[BUFFER_SIZE];
         packet = new DatagramPacket(buffer, buffer.length);
-        numberOfPackages = 0;
-
-        try {
-            socket = new DatagramSocket(PORT);
-            socket.setBroadcast(true);
-        } catch (SocketException e) {
-            System.err.println(e);
-        }
+        socket = new DatagramSocket(PORT);
     }
 
-    protected void sendInfoPacket(InetAddress address) {
-        buffer = ByteBuffer.allocate(numberOfPackages).array();
+    protected void sendInfoPacket(int value, InetAddress address) throws IOException {
+        buffer = ByteBuffer.allocate(BUFFER_SIZE).putInt(value).array();
         packet = new DatagramPacket(buffer, buffer.length, address, PORT);
-
         try {
-            socket.send(packet);
-            System.out.println("Successful sent to " + packet.getAddress().getHostAddress() + "\n===================");
-        } catch (IOException e) {
-            System.err.println(e);
+            Thread.sleep(TIMEOUT);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
-    }
-
-    protected boolean isActive(){
-        return (numberOfPackages != 100); //for testing
+        socket.send(packet);
+        System.out.println("Successfully sent result to " + address.getHostAddress() + "\n===================");
     }
 
     public void run() {
         System.out.println("Waiting for request...\n");
+        int numberOfReceivedPackages = 0;
+
         while (true) {
             try {
                 socket.receive(packet);
                 InetAddress address = packet.getAddress();
+                int packageInfo = ByteBuffer.wrap(packet.getData()).getInt();
 
-                try {
-                    Thread.sleep(5000);
-                } catch (InterruptedException e) {
-                    System.err.println(e);
+                if (packageInfo == START_MSG) {
+                    System.out.println("Test started with " + address.getHostAddress() + "\n===================");
+                    numberOfReceivedPackages = 0;
+                } else if (packageInfo == END_MSG) {
+                    System.out.println("\nTest finished\n===================");
+                    sendInfoPacket(numberOfReceivedPackages, address);
+                } else {
+                    numberOfReceivedPackages++;
+                    System.out.println("Got packet number " + Integer.toString(packageInfo));
                 }
-
-                System.out.println("Starting the test with " + address.getHostAddress()+"\n===================");
-                while (isActive()) {
-                    try {
-                        socket.receive(packet);
-                        numberOfPackages++;
-                        System.out.println("Get packet number" + Integer.toString(numberOfPackages));
-                    } catch (IOException e) {
-                        System.err.println("Packet has missed");
-                    }
-                }
-
-                try {
-                    Thread.sleep(5000);
-                } catch (InterruptedException e) {
-                    System.err.println(e);
-                }
-
-                sendInfoPacket(address);
             } catch (IOException e) {
                 System.err.println(e);
             }
